@@ -1,13 +1,13 @@
 const SUPABASE_URL = 'https://excnllnuwmmksasowbox.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_f0nSx5N1WKnMA9IIey7TjQ_BXttEM1y';
-const $ = id => document.getElementById(id);
-const warn = m => `<span style="color:var(--vermelho)">⚠ ${m}</span>`;
-const dbPromise = SUPABASE_URL.startsWith('COLE')
-  ? Promise.reject(new Error('Supabase não configurado'))
-  : import('https://esm.sh/@supabase/supabase-js@2').then(m => m.createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
-dbPromise.catch(e => console.error(e));
+  const SUPABASE_ANON_KEY = 'sb_publishable_f0nSx5N1WKnMA9IIey7TjQ_BXttEM1y';
+  const supabaseClientPromise = SUPABASE_URL.startsWith('COLE_AQUI')
+    ? Promise.reject(new Error('Supabase não configurado: preencha SUPABASE_URL e SUPABASE_ANON_KEY no início do script.js'))
+    : import('https://esm.sh/@supabase/supabase-js@2').then(({ createClient }) =>
+        createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      );
+  supabaseClientPromise.catch(e => console.error(e));
 
-// ─── Helpers ───
+  // ─── Helpers ───
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -51,7 +51,6 @@ dbPromise.catch(e => console.error(e));
     if (other) other.checked = src.checked;
 
     document.body.classList.toggle('dark-mode', src.checked);
-    try { localStorage.setItem('theme', src.checked ? 'dark' : 'light'); } catch (e) {}
 
     // Troca a logo central conforme o tema
     const logo = document.getElementById('formLogo');
@@ -188,250 +187,732 @@ dbPromise.catch(e => console.error(e));
     }).join(' ');
   }
 
-  
-// ─── Campos exigidos por cada mensagem (detectados pelos {marcadores} do texto) ───
-const FIELD_KEYS = {
-  name: ['name'], gender: ['gender', 'genderAdj', 'genderPart'], protocol: ['protocol'],
-  phone: ['phone'], multa: ['multa'], mensalidade: ['mensalidade'],
-  agend: ['agendEspecialidade', 'agendDataHora', 'agendClinica']
-};
-function needs(content) {
-  const used = new Set((content.match(/\{(\w+)\}/g) || []).map(k => k.slice(1, -1)));
-  const r = {};
-  Object.entries(FIELD_KEYS).forEach(([f, ks]) => { r[f] = ks.some(k => used.has(k)); });
-  return r;
-}
+  // ─── Textos (vêm somente do banco: tabela text_templates) ───
+  let texts = {};
+  const templateLabels = {};
 
-let templates = [];
-const currentTemplate = () => templates.find(t => t.id === $('purpose').value);
+  // ─── Textos da interface (tabela app_settings) ───
+  let appSettings = {}; // chave -> { label, value, multiline }
 
-function onPurposeChange() {
-  const t = currentTemplate();
-  const n = t ? needs(t.content) : {};
-  ['name', 'protocol', 'gender', 'phone', 'multa', 'mensalidade', 'agend'].forEach(f => { $('g-' + f).hidden = !n[f]; });
-  syncMes();
-}
-function syncMes() {
-  const m = document.querySelector('input[name="mensalidade"]:checked');
-  $('g-mes').hidden = $('g-mensalidade').hidden || !m || m.value !== 'nao';
-}
-
-function generateText() {
-  const out = $('generatedText');
-  const t = currentTemplate();
-  out.classList.remove('is-empty');
-  if (!t) { out.innerHTML = warn('Selecione uma finalidade.'); return; }
-  const n = needs(t.content), v = { greeting: getGreeting() }, miss = [];
-  const radio = name => document.querySelector(`input[name="${name}"]:checked`);
-
-  if (n.name) { const x = $('name').value.trim(); if (!x) miss.push('nome'); v.name = capitalizarNome(x); }
-  if (n.protocol) { const x = $('protocol').value.trim(); if (!/^[0-9]+$/.test(x)) miss.push('protocolo (somente números)'); v.protocol = x; }
-  if (n.gender) {
-    const g = radio('gender');
-    if (!g) miss.push('sexo');
-    const set = { masculino: ['Prezado', 'tranquilo', 'comunicado'], feminino: ['Prezada', 'tranquila', 'comunicada'] }[g && g.value]
-      || ['Prezado(a)', 'tranquilo(a)', 'comunicado(a)'];
-    [v.gender, v.genderAdj, v.genderPart] = set;
+  function settingValue(key, fallback) {
+    return appSettings[key] ? appSettings[key].value : fallback;
   }
-  if (n.phone) { v.phone = $('phoneContact').value.trim(); if (!v.phone) miss.push('telefone'); }
-  if (n.agend) {
-    v.agendEspecialidade = $('agendEspecialidade').value.trim();
-    v.agendDataHora = $('agendDataHora').value.trim();
-    v.agendClinica = $('agendClinica').value.trim();
-    if (!v.agendEspecialidade || !v.agendDataHora || !v.agendClinica) miss.push('especialidade, data/hora e clínica');
-  }
-  if (n.multa) {
-    const g = radio('vigencia');
-    if (!g) miss.push('vigência');
-    v.multa = g && g.value === 'sim' ? 'não haverá cobrança de multa contratual.' : 'haverá cobrança de multa contratual.';
-  }
-  if (n.mensalidade) {
-    const g = radio('mensalidade'), mes = $('mesMensalidade').value.trim();
-    if (!g) miss.push('mensalidades em aberto');
-    else if (g.value === 'nao' && !mes) miss.push('mês da última mensalidade');
-    v.mensalidade = g && g.value === 'sim'
-      ? 'Reforçamos que o seu contrato possui mensalidades em aberto, portanto orientamos que entre em contato com a nossa central de atendimento, caso seja do seu interesse.'
-      : `Reforçamos que o seu contrato não possui mensalidades em aberto, sendo a última mensalidade devida referente ao mês ${mes}.`;
-  }
-  if (miss.length) { out.innerHTML = warn('Preencha: ' + miss.join(', ') + '.'); return; }
 
-  // Uma única passada: o que foi digitado nunca é reinterpretado como marcador.
-  const text = t.content.replace(/\{(\w+)\}/g, (m, k) => Object.prototype.hasOwnProperty.call(v, k) ? v[k] : m);
-  out.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
-}
+  function applyAppSettings() {
+    if (appSettings['app.document_title']) document.title = appSettings['app.document_title'].value;
 
-// ─── Abrangências (consulta) ───
-function renderPlanDetails(content) {
-  return content.split(/\s\|\s|\n/).filter(p => p.trim()).map(part => {
-    const i = part.indexOf(':');
-    return i > 0 ? `<strong>${escapeHtml(part.slice(0, i + 1))}</strong>${escapeHtml(part.slice(i + 1))}` : escapeHtml(part.trim());
-  }).join('<br>');
-}
-async function consultarPlano() {
-  const code = $('inputNumber').value.trim(), out = $('resultado');
-  const notFound = warn('Código não localizado. Revise-o e tente novamente.');
-  if (!/^[0-9]+$/.test(code)) { out.innerHTML = notFound; return; }
-  out.textContent = 'Consultando…';
-  try {
-    const db = await dbPromise;
-    const { data, error } = await db.from('plan_details').select('content').eq('product_code', code).maybeSingle();
-    if (error) throw error;
-    out.innerHTML = data ? renderPlanDetails(data.content) : notFound;
-  } catch (e) {
-    console.error(e);
-    out.innerHTML = warn('Não foi possível consultar o banco de dados. Tente novamente.');
+    document.querySelectorAll('[data-setting]').forEach(el => {
+      const setting = appSettings[el.dataset.setting];
+      if (!setting) return;
+      if (el.dataset.fallback !== undefined) {
+        // Mensagem inicial de resultado: só troca se ainda não foi substituída por um resultado
+        if (el.textContent.trim() !== el.dataset.fallback) return;
+        el.dataset.fallback = setting.value;
+      }
+      el.textContent = setting.value;
+    });
+
+    document.querySelectorAll('[data-setting-placeholder]').forEach(el => {
+      const setting = appSettings[el.dataset.settingPlaceholder];
+      if (setting) el.setAttribute('placeholder', setting.value);
+    });
+
+    if (Object.keys(texts).length) populatePurposeSelect();
   }
-}
 
-// ─── Carregar mensagens ───
-async function loadTemplates(selectId = '') {
-  const sel = $('purpose'), keep = sel.value;
-  try {
-    const db = await dbPromise;
-    const { data, error } = await db.from('text_templates').select('id, label, content').order('label');
-    if (error) throw error;
-    templates = data;
-  } catch (e) {
-    console.error(e);
-    sel.innerHTML = '<option value="">— Banco não conectado —</option>';
-    $('generatedText').innerHTML = warn('Não foi possível carregar as mensagens. Confira a conexão com o Supabase.');
-    return;
+  const SETTING_PREFIX = { app: 'Geral', nav: 'Menu', page: 'Página', form: 'Formulário', calc: 'Calculadora',
+    button: 'Botão', result: 'Resultado', generator: 'Resultado inicial', calculator: 'Resultado inicial', purpose: 'Finalidade' };
+
+  function captureDefaultSettings() {
+    const add = (key, value, multiline) => {
+      if (!key || !value || appSettings[key]) return;
+      const prefix = SETTING_PREFIX[key.split('.')[0]] || 'Texto';
+      const short = value.length > 48 ? value.slice(0, 48) + '…' : value;
+      appSettings[key] = { label: `${prefix}: ${short}`, value, multiline };
+    };
+    document.querySelectorAll('[data-setting]').forEach(el =>
+      add(el.dataset.setting, el.dataset.fallback !== undefined ? el.dataset.fallback : el.textContent.trim(), false));
+    document.querySelectorAll('[data-setting-placeholder]').forEach(el =>
+      add(el.dataset.settingPlaceholder, el.getAttribute('placeholder') || '', el.tagName === 'TEXTAREA'));
+    add('app.document_title', document.title, false);
+    add('purpose.placeholder', '— Selecione um tópico —', false);
   }
-  const opts = templates.map(t => `<option value="${t.id}">${escapeHtml(t.label)}</option>`).join('');
-  sel.innerHTML = `<option value="">${templates.length ? '— Selecione uma finalidade —' : '— Nenhuma mensagem cadastrada —'}</option>` + opts;
-  if (templates.some(t => t.id === keep)) sel.value = keep;
-  $('tplSelect').innerHTML = '<option value="">+ Nova mensagem</option>' + opts;
-  selectTemplate(selectId);
-  onPurposeChange();
-}
 
-// ─── Administração ───
-function msg(text, type = '', id = 'adminSaveMessage') { const e = $(id); e.textContent = text; e.className = 'admin-message ' + type; }
-function setAdminView(on) { $('adminLoginCard').hidden = on; $('adminEditorCard').hidden = !on; if (on) loadPlans(); }
-async function isAdmin() {
-  try {
-    const db = await dbPromise;
-    const { data: { session } } = await db.auth.getSession();
-    if (!session) return false;
-    const { data } = await db.from('admin_users').select('user_id').eq('user_id', session.user.id).maybeSingle();
-    return Boolean(data);
-  } catch (e) { return false; }
-}
-async function requireAdmin() {
-  if (await isAdmin()) return true;
-  setAdminView(false);
-  msg('Entre novamente para continuar.', 'error', 'adminAuthMessage');
-  return false;
-}
-async function handleAdminLogin(ev) {
-  ev.preventDefault();
-  msg('Entrando...', '', 'adminAuthMessage');
-  try {
-    const db = await dbPromise;
-    const { error } = await db.auth.signInWithPassword({ email: $('adminEmail').value.trim(), password: $('adminPassword').value });
-    if (error || !(await isAdmin())) {
-      if (!error) await db.auth.signOut();
-      msg('Não foi possível entrar com essa conta.', 'error', 'adminAuthMessage');
+  async function loadAppSettings() {
+    document.querySelectorAll('[data-setting]').forEach(el => {
+      if (el.dataset.setting.endsWith('.result.initial')) el.dataset.fallback = el.textContent.trim();
+    });
+    appSettings = {};
+    captureDefaultSettings(); // padrão = textos que já estão no HTML; o banco só guarda o que for alterado
+    try {
+      const supabase = await supabaseClientPromise;
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('setting_key, label, setting_value, multiline');
+      if (error) throw error;
+      data.forEach(row => {
+        appSettings[row.setting_key] = { label: row.label, value: row.setting_value, multiline: row.multiline };
+      });
+    } catch (e) {
+      console.error('Could not load app settings', e);
+    }
+    applyAppSettings();
+    renderAppSettingsEditor();
+  }
+
+  function renderAppSettingsEditor() {
+    const list = document.getElementById('appSettingsList');
+    if (!list) return;
+    list.replaceChildren();
+    Object.entries(appSettings).forEach(([key, setting]) => {
+      const group = document.createElement('div');
+      group.className = 'form-group';
+
+      const label = document.createElement('label');
+      label.setAttribute('for', `setting-${key}`);
+      label.textContent = setting.label;
+
+      const field = document.createElement(setting.multiline ? 'textarea' : 'input');
+      if (setting.multiline) field.rows = 6; else field.type = 'text';
+      field.id = `setting-${key}`;
+      field.dataset.settingKey = key;
+      field.value = setting.value;
+
+      group.append(label, field);
+      list.appendChild(group);
+    });
+  }
+
+  async function saveAppSettings() {
+    if (!(await checkAdminSession())) {
+      setAdminView(false);
+      showAdminMessage('adminAuthMessage', 'Entre novamente para editar os textos.', 'error');
       return;
     }
-    msg('', '', 'adminAuthMessage');
+
+    const rows = [];
+    document.querySelectorAll('#appSettingsList [data-setting-key]').forEach(field => {
+      const key = field.dataset.settingKey;
+      if (field.value.trim() === '') return; // nunca salva campo vazio
+      if (field.value !== appSettings[key].value) {
+        rows.push({
+          setting_key: key,
+          label: appSettings[key].label,
+          setting_value: field.value,
+          multiline: appSettings[key].multiline
+        });
+      }
+    });
+
+    if (!rows.length) {
+      showAdminMessage('adminSaveMessage', 'Nenhuma alteração para salvar.', '');
+      return;
+    }
+
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      showAdminMessage('adminSaveMessage', 'Sem conexão com o servidor. Tente novamente.', 'error');
+      return;
+    }
+    const { error } = await supabase.from('app_settings').upsert(rows, { onConflict: 'setting_key' });
+    if (error) {
+      console.error('Could not save app settings', error);
+      showAdminMessage('adminSaveMessage', 'Não foi possível salvar os textos da interface.', 'error');
+      return;
+    }
+
+    rows.forEach(r => { appSettings[r.setting_key].value = r.setting_value; });
+    applyAppSettings();
+    showAdminMessage('adminSaveMessage', `${rows.length} texto(s) da interface salvo(s).`, 'success');
+  }
+
+  function populatePurposeSelect() {
+    const select = document.getElementById('purpose');
+    if (!select) return;
+    const current = select.value;
+    select.replaceChildren();
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = settingValue('purpose.placeholder', '— Selecione um tópico —');
+    select.appendChild(placeholder);
+
+    Object.keys(texts)
+      .sort((a, b) => templateLabel(a).localeCompare(templateLabel(b), 'pt-BR'))
+      .forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = templateLabel(key);
+        select.appendChild(opt);
+      });
+
+    if (current && texts[current] !== undefined) select.value = current;
+  }
+
+  async function loadSavedTemplates() {
+    const select = document.getElementById('purpose');
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      console.error('Supabase indisponível', e);
+      showTemplatesError(select);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('text_templates')
+      .select('template_key, label, content');
+
+    if (error) {
+      console.error('Could not load saved templates', error);
+      showTemplatesError(select);
+      return;
+    }
+
+    texts = {};
+    Object.keys(templateLabels).forEach(k => delete templateLabels[k]);
+    data.forEach(template => {
+      texts[template.template_key] = template.content;
+      templateLabels[template.template_key] = template.label;
+    });
+
+    populatePurposeSelect();
+    togglePhoneField();
+    refreshAdminTemplateOptions();
+    if (selectedTemplateKey && texts[selectedTemplateKey] === undefined) selectedTemplateKey = '';
+    renderTemplateEditor();
+  }
+
+  function showTemplatesError(select) {
+    if (select) select.options[0].textContent = '— Não foi possível carregar os textos —';
+    const result = document.getElementById('generatedText');
+    if (result) result.innerHTML = '<span style="color:var(--vermelho)">⚠ Não foi possível carregar os textos do banco de dados. Recarregue a página.</span>';
+  }
+
+  async function checkAdminSession() {
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      console.error('Supabase indisponível', e);
+      return false;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return false;
+
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('user_id')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Could not check admin access', error);
+      return false;
+    }
+
+    return Boolean(data);
+  }
+
+  function showAdminMessage(id, message, type = '') {
+    const element = document.getElementById(id);
+    element.textContent = message;
+    element.className = `admin-message ${type}`;
+  }
+
+  function templateLabel(key) {
+    return templateLabels[key] || key;
+  }
+
+  let selectedTemplateKey = '';
+
+  function refreshAdminTemplateOptions() {
+    const select = document.getElementById('adminTemplateSelect');
+    if (!select) return;
+    const currentValue = selectedTemplateKey;
+    select.replaceChildren();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '— Selecione uma mensagem —';
+    select.appendChild(placeholder);
+
+    Object.keys(texts).forEach(key => {
+      const option = document.createElement('option');
+      option.value = key;
+      option.textContent = templateLabel(key);
+      select.appendChild(option);
+    });
+    select.value = currentValue;
+  }
+
+  function selectTemplateToEdit(key) {
+    selectedTemplateKey = key;
+    renderTemplateEditor();
+  }
+
+  function renderTemplateEditor() {
+    const list = document.getElementById('templateEditorList');
+    list.replaceChildren();
+    if (!selectedTemplateKey || !Object.prototype.hasOwnProperty.call(texts, selectedTemplateKey)) {
+      const empty = document.createElement('p');
+      empty.className = 'template-editor-empty';
+      empty.textContent = 'Selecione uma mensagem acima para começar a editar.';
+      list.appendChild(empty);
+      return;
+    }
+
+    const group = document.createElement('div');
+    group.className = 'template-editor-item';
+
+    const header = document.createElement('div');
+    header.className = 'template-editor-header';
+
+    const label = document.createElement('label');
+    label.setAttribute('for', `template-${selectedTemplateKey}`);
+    label.textContent = templateLabel(selectedTemplateKey);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-delete-template';
+    deleteBtn.textContent = 'Excluir mensagem';
+    deleteBtn.onclick = () => deleteTemplate(selectedTemplateKey);
+
+    header.append(label, deleteBtn);
+
+    const textarea = document.createElement('textarea');
+    textarea.id = `template-${selectedTemplateKey}`;
+    textarea.dataset.templateKey = selectedTemplateKey;
+    textarea.rows = 14;
+    textarea.value = texts[selectedTemplateKey];
+
+    group.append(header, textarea);
+    list.appendChild(group);
+  }
+
+  function setAdminView(isAdmin) {
+    document.getElementById('adminLoginCard').hidden = isAdmin;
+    document.getElementById('adminEditorCard').hidden = !isAdmin;
+    if (isAdmin) {
+      loadPlansAdmin();
+      refreshAdminTemplateOptions();
+      renderTemplateEditor();
+    }
+  }
+
+  async function handleAdminLogin(event) {
+    event.preventDefault();
+    showAdminMessage('adminAuthMessage', 'Entrando...');
+
+    const email = document.getElementById('adminEmail').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      showAdminMessage('adminAuthMessage', 'Sem conexão com o servidor. Tente novamente.', 'error');
+      return;
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error || !(await checkAdminSession())) {
+      if (!error) await supabase.auth.signOut();
+      showAdminMessage('adminAuthMessage', 'Não foi possível entrar com essa conta.', 'error');
+      return;
+    }
+
+    showAdminMessage('adminAuthMessage', '');
     setAdminView(true);
-  } catch (e) { msg('Sem conexão com o servidor. Tente novamente.', 'error', 'adminAuthMessage'); }
-}
-async function signOutAdmin() {
-  try { await (await dbPromise).auth.signOut(); } catch (e) {}
-  setAdminView(false);
-  msg('Você saiu da área administrativa.', 'success', 'adminAuthMessage');
-}
+  }
 
-function selectTemplate(id) {
-  const t = templates.find(x => x.id === id);
-  $('tplSelect').value = t ? id : '';
-  $('tplLabel').value = t ? t.label : '';
-  $('tplContent').value = t ? t.content : '';
-  $('tplDelete').hidden = !t;
-}
-function insertField(k) {
-  const el = $('tplContent'), a = el.selectionStart, b = el.selectionEnd;
-  el.setRangeText('{' + k + '}', a, b, 'end');
-  el.focus();
-}
-async function saveTemplate() {
-  if (!(await requireAdmin())) return;
-  const id = $('tplSelect').value, label = $('tplLabel').value.trim(), content = $('tplContent').value.trim();
-  if (!label || !content) { msg('Preencha o nome e o texto da mensagem.', 'error'); return; }
-  const db = await dbPromise, t = db.from('text_templates');
-  const { data, error } = await (id
-    ? t.update({ label, content, updated_at: new Date().toISOString() }).eq('id', id)
-    : t.insert({ label, content })).select('id').single();
-  if (error) { console.error(error); msg('Não foi possível salvar a mensagem.', 'error'); return; }
-  await loadTemplates(data.id);
-  msg('Mensagem salva.', 'success');
-}
-async function deleteTemplate() {
-  const id = $('tplSelect').value, t = templates.find(x => x.id === id);
-  if (!t || !(await requireAdmin()) || !confirm(`Excluir a mensagem "${t.label}"?`)) return;
-  const { error } = await (await dbPromise).from('text_templates').delete().eq('id', id);
-  if (error) { msg('Não foi possível excluir a mensagem.', 'error'); return; }
-  await loadTemplates('');
-  msg('Mensagem excluída.', 'success');
-}
+  async function createAdminAccount() {
+    showAdminMessage('adminAuthMessage', 'Criando acesso...');
 
-async function loadPlans(selectCode = '') {
-  try {
-    const { data, error } = await (await dbPromise).from('plan_details').select('product_code').order('product_code');
-    if (error) throw error;
-    $('planSelect').innerHTML = '<option value="">+ Novo código</option>' + data.map(r => `<option>${escapeHtml(r.product_code)}</option>`).join('');
-  } catch (e) { console.error(e); }
-  selectPlan(selectCode);
-}
-async function selectPlan(code) {
-  $('planSelect').value = code;
-  $('planCode').value = code;
-  $('planContent').value = '';
-  $('planDelete').hidden = !code;
-  if (!code) return;
-  const { data } = await (await dbPromise).from('plan_details').select('content').eq('product_code', code).maybeSingle();
-  $('planContent').value = data ? data.content : '';
-}
-async function savePlan() {
-  if (!(await requireAdmin())) return;
-  const code = $('planCode').value.trim(), content = $('planContent').value.trim();
-  if (!/^[0-9]+$/.test(code) || !content) { msg('Informe o código (somente números) e os detalhes da cobertura.', 'error'); return; }
-  const { error } = await (await dbPromise).from('plan_details').upsert({ product_code: code, content, updated_at: new Date().toISOString() }, { onConflict: 'product_code' });
-  if (error) { console.error(error); msg('Não foi possível salvar a abrangência.', 'error'); return; }
-  await loadPlans(code);
-  msg('Abrangência salva.', 'success');
-}
-async function deletePlan() {
-  const code = $('planSelect').value;
-  if (!code || !(await requireAdmin()) || !confirm(`Excluir o código ${code}?`)) return;
-  const { error } = await (await dbPromise).from('plan_details').delete().eq('product_code', code);
-  if (error) { msg('Não foi possível excluir a abrangência.', 'error'); return; }
-  await loadPlans('');
-  msg('Abrangência excluída.', 'success');
-}
+    const email = document.getElementById('adminEmail').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      showAdminMessage('adminAuthMessage', 'Sem conexão com o servidor. Tente novamente.', 'error');
+      return;
+    }
+    const { data, error } = await supabase.auth.signUp({ email, password });
 
-document.addEventListener('DOMContentLoaded', () => {
-  $('adminAuthForm').addEventListener('submit', handleAdminLogin);
-  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b));
-    ['tabMsg', 'tabPlan'].forEach(id => { $(id).hidden = id !== b.dataset.tab; });
-  }));
-  document.querySelectorAll('input[name="mensalidade"]').forEach(r => r.addEventListener('change', syncMes));
-  [['inputNumber', consultarPlano], ['name', generateText], ['protocol', generateText], ['mesMensalidade', generateText],
-   ['valorMensalidade', calcularMulta], ['mesesFaltantes', calcularMulta],
-   ['valorTotalProduto', calcularProporcional], ['quantidadeDias', calcularProporcional]
-  ].forEach(([id, fn]) => $(id).addEventListener('keypress', e => { if (e.key === 'Enter') fn(); }));
-  loadTemplates();
-  isAdmin().then(setAdminView);
-});
+    if (error || !data.user) {
+      showAdminMessage('adminAuthMessage', 'Não foi possível criar o acesso. Confira os dados informados.', 'error');
+      return;
+    }
 
-// ─── Tema: lembra a escolha e respeita o modo do aparelho na primeira visita ───
-  document.addEventListener('DOMContentLoaded', () => {
-    let saved = null;
-    try { saved = localStorage.getItem('theme'); } catch (e) {}
-    const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const btn = document.getElementById('toggleModeBtn');
-    if (btn && dark) { btn.checked = true; syncAndToggle(btn); }
+    if (!data.session) {
+      showAdminMessage('adminAuthMessage', 'A conta foi criada. Verifique seu e-mail para concluir o acesso.', 'success');
+      return;
+    }
+
+    if (await checkAdminSession()) {
+      setAdminView(true);
+      showAdminMessage('adminSaveMessage', 'Acesso administrativo criado.', 'success');
+    } else {
+      showAdminMessage('adminAuthMessage', 'Esta conta não possui acesso administrativo.', 'error');
+    }
+  }
+
+  async function saveTemplates() {
+    const isAdmin = await checkAdminSession();
+    if (!isAdmin) {
+      setAdminView(false);
+      showAdminMessage('adminAuthMessage', 'Entre novamente para editar os textos.', 'error');
+      return;
+    }
+
+    const textarea = document.querySelector('#templateEditorList textarea');
+    if (!textarea || !selectedTemplateKey) {
+      showAdminMessage('adminSaveMessage', 'Selecione uma mensagem antes de salvar.', 'error');
+      return;
+    }
+
+    const row = {
+      template_key: selectedTemplateKey,
+      label: templateLabel(selectedTemplateKey),
+      content: textarea.value
+    };
+
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      showAdminMessage('adminSaveMessage', 'Sem conexão com o servidor. Tente novamente.', 'error');
+      return;
+    }
+    const { error } = await supabase.from('text_templates').upsert(row, { onConflict: 'template_key' });
+
+    if (error) {
+      console.error('Could not save templates', error);
+      showAdminMessage('adminSaveMessage', 'Não foi possível salvar as alterações.', 'error');
+      return;
+    }
+
+    texts[row.template_key] = row.content;
+    togglePhoneField();
+    showAdminMessage('adminSaveMessage', 'Mensagem salva com sucesso.', 'success');
+  }
+
+  function slugifyLabel(label) {
+    const slug = label.trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return 'custom_' + (slug || 'modelo') + '_' + Date.now().toString(36);
+  }
+
+  function addNewTemplate() {
+    const labelInput = document.getElementById('newTemplateLabel');
+    const contentInput = document.getElementById('newTemplateContent');
+    const label = labelInput.value.trim();
+    const content = contentInput.value.trim();
+
+    if (!label || !content) {
+      showAdminMessage('adminSaveMessage', 'Preencha o nome e o texto da nova mensagem.', 'error');
+      return;
+    }
+
+    const key = slugifyLabel(label);
+    texts[key] = content;
+    templateLabels[key] = label;
+    populatePurposeSelect();
+
+    selectedTemplateKey = key;
+    refreshAdminTemplateOptions();
+    labelInput.value = '';
+    contentInput.value = '';
+    renderTemplateEditor();
+    showAdminMessage('adminSaveMessage', 'Nova mensagem adicionada. Clique em "Salvar mensagem selecionada" para confirmar.', 'success');
+  }
+
+  async function deleteTemplate(key) {
+    if (!confirm(`Excluir a mensagem "${templateLabel(key)}"? Ela deixará de aparecer no gerador.`)) return;
+
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      showAdminMessage('adminSaveMessage', 'Sem conexão com o servidor. Tente novamente.', 'error');
+      return;
+    }
+    const { error } = await supabase
+      .from('text_templates')
+      .delete()
+      .eq('template_key', key);
+
+    if (error) {
+      showAdminMessage('adminSaveMessage', 'Não foi possível excluir a mensagem.', 'error');
+      return;
+    }
+
+    delete texts[key];
+    delete templateLabels[key];
+    populatePurposeSelect();
+    togglePhoneField();
+
+    selectedTemplateKey = '';
+    refreshAdminTemplateOptions();
+    renderTemplateEditor();
+    showAdminMessage('adminSaveMessage', 'Mensagem excluída.', 'success');
+  }
+
+  async function signOutAdmin() {
+    try {
+      const supabase = await supabaseClientPromise;
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Falha ao sair', e);
+    }
+    setAdminView(false);
+    showAdminMessage('adminAuthMessage', 'Você saiu da área administrativa.', 'success');
+  }
+
+  function initializeAdmin() {
+    document.getElementById('adminAuthForm').addEventListener('submit', handleAdminLogin);
+    loadAppSettings().catch(err => console.error('Falha ao carregar textos da interface', err));
+    loadSavedTemplates().catch(err => console.error('Falha ao carregar modelos', err));
+    checkAdminSession().then(setAdminView).catch(err => console.error(err));
+  }
+
+  // ─── Text editor and admin access ───
+  const FIELD_KEYS = {
+    name: ['name'], gender: ['gender', 'genderAdj', 'genderPart'], protocol: ['protocol'], phone: ['phone'],
+    multa: ['multa'], mensalidade: ['mensalidade'], agend: ['agendEspecialidade', 'agendDataHora', 'agendClinica']
+  };
+
+  function templateNeeds(content) {
+    const used = new Set((content.match(/\{(\w+)\}/g) || []).map(k => k.slice(1, -1)));
+    const needs = {};
+    Object.entries(FIELD_KEYS).forEach(([field, keys]) => { needs[field] = keys.some(k => used.has(k)); });
+    return needs;
+  }
+
+  function togglePhoneField() {
+    const purpose = document.getElementById('purpose').value;
+    const known = purpose && texts[purpose] !== undefined;
+    const n = known ? templateNeeds(texts[purpose]) : {};
+    const base = !purpose; // sem finalidade escolhida: mostra os campos básicos
+    const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+
+    show('nameGroup', base || n.name);
+    show('protocolGroup', base || n.protocol);
+    show('genderGroup', base || n.gender);
+    show('phoneGroup', n.phone);
+    show('cancelamentoGroup', n.multa || n.mensalidade);
+    show('vigenciaGroup', n.multa);
+    show('mensalidadeGroup', n.mensalidade);
+    show('agendamentoGroup', n.agend);
+
+    if (!base && !n.name) document.getElementById('name').value = '';
+    if (!base && !n.protocol) document.getElementById('protocol').value = '';
+    if (!base && !n.gender) document.querySelectorAll('input[name="gender"]').forEach(r => r.checked = false);
+    if (!n.phone) document.getElementById('phoneContact').value = '';
+    if (!n.multa) document.querySelectorAll('input[name="vigencia"]').forEach(r => r.checked = false);
+    if (!n.mensalidade) {
+      document.querySelectorAll('input[name="mensalidade"]').forEach(r => r.checked = false);
+      document.getElementById('mesMensalidade').value = '';
+      document.getElementById('mesMensalidadeGroup').style.display = 'none';
+    }
+    if (!n.agend) {
+      ['agendEspecialidade', 'agendDataHora', 'agendClinica'].forEach(id => { document.getElementById(id).value = ''; });
+    }
+  }
+
+  // ─── Enter key shortcuts ───
+  document.addEventListener('DOMContentLoaded', function() {
+    [['inputNumber', consultarPlano], ['name', generateText], ['protocol', generateText],
+     ['valorMensalidade', calcularMulta], ['mesesFaltantes', calcularMulta],
+     ['valorTotalProduto', calcularProporcional], ['quantidadeDias', calcularProporcional],
+     ['mesMensalidade', generateText]
+    ].forEach(([id, fn]) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('keypress', e => { if (e.key === 'Enter') fn(); });
+    });
+
+    document.querySelectorAll('input[name="mensalidade"]').forEach(radio => {
+      radio.addEventListener('change', function() {
+        document.getElementById("mesMensalidadeGroup").style.display =
+          this.value === 'nao' ? 'block' : 'none';
+        if (this.value !== 'nao') document.getElementById("mesMensalidade").value = '';
+      });
+    });
   });
+
+  function generateText() {
+    const out = document.getElementById('generatedText');
+    const purpose = document.getElementById('purpose').value;
+    const warn = m => { out.innerHTML = `<span style="color:var(--vermelho)">⚠ ${m}</span>`; };
+    if (!purpose) return warn('Selecione uma finalidade.');
+    if (texts[purpose] === undefined) return warn('Texto não encontrado. Recarregue a página.');
+
+    const n = templateNeeds(texts[purpose]);
+    const val = id => document.getElementById(id).value.trim();
+    const radio = name => document.querySelector(`input[name="${name}"]:checked`);
+    const values = { greeting: getGreeting() };
+    const missing = [];
+
+    if (n.name) { values.name = val('name'); if (!values.name) missing.push('nome'); else values.name = capitalizarNome(values.name); }
+    if (n.protocol) {
+      values.protocol = val('protocol');
+      if (!values.protocol) missing.push('protocolo');
+      else if (!/^[0-9]+$/.test(values.protocol)) return warn('O campo Protocolo deve conter apenas números.');
+    }
+    if (n.gender) {
+      const g = radio('gender');
+      if (!g) missing.push('sexo');
+      const set = { masculino: ['Prezado', 'tranquilo', 'comunicado'], feminino: ['Prezada', 'tranquila', 'comunicada'] }[g && g.value]
+        || ['Prezado(a)', 'tranquilo(a)', 'comunicado(a)'];
+      [values.gender, values.genderAdj, values.genderPart] = set;
+    }
+    if (n.phone) { values.phone = val('phoneContact'); if (!values.phone) missing.push('telefone cadastrado'); }
+    if (n.agend) {
+      values.agendEspecialidade = val('agendEspecialidade');
+      values.agendDataHora = val('agendDataHora');
+      values.agendClinica = val('agendClinica');
+      if (!values.agendEspecialidade || !values.agendDataHora || !values.agendClinica) missing.push('especialidade, data/hora e clínica');
+    }
+    if (n.multa) {
+      const v = radio('vigencia');
+      if (!v) missing.push('vigência');
+      values.multa = v && v.value === 'sim' ? 'não haverá cobrança de multa contratual.' : 'haverá cobrança de multa contratual.';
+    }
+    if (n.mensalidade) {
+      const m = radio('mensalidade'), mes = val('mesMensalidade');
+      if (!m) missing.push('mensalidades em aberto');
+      else if (m.value === 'nao' && !mes) missing.push('mês da última mensalidade devida');
+      values.mensalidade = m && m.value === 'sim'
+        ? 'Reforçamos que o seu contrato possui mensalidades em aberto, portanto orientamos que entre em contato com a nossa central de atendimento, caso seja do seu interesse.'
+        : `Reforçamos que o seu contrato não possui mensalidades em aberto, sendo a última mensalidade devida referente ao mês ${mes}.`;
+    }
+    if (missing.length) return warn('Preencha: ' + missing.join(', ') + '.');
+
+    // Uma única passada: valores digitados nunca são reinterpretados como marcadores.
+    const text = texts[purpose].replace(/\{(\w+)\}/g, (match, key) =>
+      Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match);
+    out.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+  }
+  // ─── Planos ───
+  function renderPlanDetails(content) {
+    // O conteúdo vem do banco no formato "Item. | Chave: valor. | Chave: valor."
+    return content.split(/ \| |\n/).filter(p => p.trim()).map((part, i) => {
+      const text = part.trim();
+      const colon = text.indexOf(':');
+      if (i > 0 && colon > 0) {
+        return `<strong>${escapeHtml(text.slice(0, colon + 1))}</strong>${escapeHtml(text.slice(colon + 1))}`;
+      }
+      return escapeHtml(text);
+    }).join('<br>');
+  }
+
+  async function consultarPlano() {
+    const code = document.getElementById("inputNumber").value.trim();
+    const out = document.getElementById("resultado");
+    const notFound = '<span style="color:var(--vermelho)">⚠ Código não localizado. Revise-o e tente novamente.</span>';
+
+    if (!/^[0-9]+$/.test(code)) {
+      out.innerHTML = notFound;
+      return;
+    }
+
+    out.textContent = 'Consultando…';
+    let supabase;
+    try {
+      supabase = await supabaseClientPromise;
+    } catch (e) {
+      out.innerHTML = '<span style="color:var(--vermelho)">⚠ Não foi possível consultar o banco de dados. Tente novamente.</span>';
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('plan_details')
+      .select('content')
+      .eq('product_code', code)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Could not load plan details', error);
+      out.innerHTML = '<span style="color:var(--vermelho)">⚠ Não foi possível consultar o banco de dados. Tente novamente.</span>';
+      return;
+    }
+
+    out.innerHTML = data ? renderPlanDetails(data.content) : notFound;
+  }
+
+  // ─── Abrangências: cadastro pelo site ───
+  async function loadPlansAdmin(selectCode = '') {
+    const select = document.getElementById('planSelectAdmin');
+    if (!select) return;
+    try {
+      const supabase = await supabaseClientPromise;
+      const { data, error } = await supabase.from('plan_details').select('product_code').order('product_code');
+      if (error) throw error;
+      select.replaceChildren(new Option('+ Novo código', ''), ...data.map(r => new Option(r.product_code, r.product_code)));
+    } catch (e) {
+      console.error('Could not load plan codes', e);
+    }
+    await selectPlanToEdit(selectCode);
+  }
+
+  async function selectPlanToEdit(code) {
+    document.getElementById('planSelectAdmin').value = code;
+    document.getElementById('planCodeAdmin').value = code;
+    document.getElementById('planContentAdmin').value = '';
+    document.getElementById('planDeleteAdmin').hidden = !code;
+    if (!code) return;
+    try {
+      const supabase = await supabaseClientPromise;
+      const { data } = await supabase.from('plan_details').select('content').eq('product_code', code).maybeSingle();
+      if (data) document.getElementById('planContentAdmin').value = data.content;
+    } catch (e) {
+      console.error('Could not load plan', e);
+    }
+  }
+
+  async function requireAdminForPlans() {
+    if (await checkAdminSession()) return true;
+    setAdminView(false);
+    showAdminMessage('adminAuthMessage', 'Entre novamente para editar as abrangências.', 'error');
+    return false;
+  }
+
+  async function savePlanAdmin() {
+    if (!(await requireAdminForPlans())) return;
+    const code = document.getElementById('planCodeAdmin').value.trim();
+    const content = document.getElementById('planContentAdmin').value.trim();
+    if (!/^[0-9]+$/.test(code) || !content) {
+      showAdminMessage('adminSaveMessage', 'Informe o registro ANS (somente números) e os detalhes da cobertura.', 'error');
+      return;
+    }
+    const supabase = await supabaseClientPromise;
+    const { error } = await supabase.from('plan_details')
+      .upsert({ product_code: code, content, updated_at: new Date().toISOString() }, { onConflict: 'product_code' });
+    if (error) {
+      console.error('Could not save plan', error);
+      showAdminMessage('adminSaveMessage', 'Não foi possível salvar a abrangência.', 'error');
+      return;
+    }
+    await loadPlansAdmin(code);
+    showAdminMessage('adminSaveMessage', 'Abrangência salva com sucesso.', 'success');
+  }
+
+  async function deletePlanAdmin() {
+    const code = document.getElementById('planSelectAdmin').value;
+    if (!code || !(await requireAdminForPlans())) return;
+    if (!confirm(`Excluir o código ${code}? Ele deixará de aparecer na consulta.`)) return;
+    const supabase = await supabaseClientPromise;
+    const { error } = await supabase.from('plan_details').delete().eq('product_code', code);
+    if (error) {
+      showAdminMessage('adminSaveMessage', 'Não foi possível excluir a abrangência.', 'error');
+      return;
+    }
+    await loadPlansAdmin('');
+    showAdminMessage('adminSaveMessage', 'Abrangência excluída.', 'success');
+  }
+
+  document.addEventListener('DOMContentLoaded', initializeAdmin);
