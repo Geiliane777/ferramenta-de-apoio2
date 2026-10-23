@@ -1,6 +1,6 @@
 const SUPABASE_URL = 'https://excnllnuwmmksasowbox.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_f0nSx5N1WKnMA9IIey7TjQ_BXttEM1y';
-  const supabaseClientPromise = SUPABASE_URL.startsWith('COLE_AQUI')
+  const supabaseClientPromise = SUPABASE_URL.startsWith('https://excnllnuwmmksasowbox.supabase.co')
     ? Promise.reject(new Error('Supabase não configurado'))
     : import('https://esm.sh/@supabase/supabase-js@2').then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
   supabaseClientPromise.catch(e => console.error(e));
