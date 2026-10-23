@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ferramentas de Apoio — OdontoGroup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="https://img.icons8.com/?size=100&id=VujT2gb9fKd5&format=png&color=000000" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+
+<div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar">
+  <button class="menu-btn" onclick="toggleSidebar()">
+    <span></span><span></span><span></span>
+  </button>
+  <span>OdontoGroup</span>
+  <label class="toggle-pill" style="margin:0">
+    <input type="checkbox" id="toggleModeBtn2" onchange="syncAndToggle(this)">
+    <div class="toggle-pill-track"></div>
+  </label>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img class="sidebar-brand-logo" src="public/images/Logo_OdontoGroup.png" alt="OdontoGroup">
+    <div class="brand-sub">Ferramentas de Apoio</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="sidebar-label">Ferramentas</div>
+
+    <div class="nav-item active" onclick="showSection('gerador', this)">
+      <div class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+      <span>Gerador de textos</span>
+    </div>
+
+    <div class="nav-item" onclick="showSection('prorata', this)">
+      <div class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+      <span>Calcular pró-rata</span>
+    </div>
+
+    <div class="nav-item" onclick="showSection('multa', this)">
+      <div class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 006 0zM19 7l-3 7a3 3 0 006 0z"/></svg></div>
+      <span>Calcular multa</span>
+    </div>
+
+    <div class="nav-item" onclick="showSection('abrangencias', this)">
+      <div class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div>
+      <span>Abrangências</span>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <a class="nav-item external" href="https://geiliane777.github.io/clinicas-especialistas/index.html" target="_blank" rel="noopener">
+      <div class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13M9 21v-6h6v6M12 8v4M10 10h4"/></svg></div>
+      <span>Redes credenciadas</span>
+    </a>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="nav-item" onclick="showSection('admin', this)">
+      <div class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 00-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 00-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 000 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 002 1.2l.4 2.6h4l.4-2.6a7 7 0 002-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg></div>
+      <span>Administração</span>
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <span class="theme-label">Modo escuro</span>
+    <label class="toggle-pill">
+      <input type="checkbox" id="toggleModeBtn" onchange="syncAndToggle(this)">
+      <div class="toggle-pill-track"></div>
+    </label>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  
+  <!-- Gerador de Textos -->
+  <div id="gerador" class="content-section active">
+    <div class="page-header"><h1 class="page-title">Gerador de textos</h1><p class="page-subtitle">Escolha a finalidade e preencha só os campos que aparecerem.</p></div>
+    <div class="gen-grid">
+    <div class="card">
+      <div class="form-group"><label for="purpose">Finalidade</label><select id="purpose" onchange="onPurposeChange()"><option value="">Carregando…</option></select></div>
+      <div class="form-group" id="g-name" hidden><label>Nome do cliente</label><input type="text" id="name" placeholder="Ex: Ana Paula Silveira" ></div>
+      <div class="form-group" id="g-protocol" hidden><label>Número do protocolo</label><input type="text" id="protocol" placeholder="Somente números" inputmode="numeric"></div>
+      <div class="form-group" id="g-gender" hidden><label>Sexo</label><div class="radio-group"><label class="radio-pill"><input type="radio" name="gender" value="masculino"><span class="radio-pill-dot"></span><span>Masculino</span></label><label class="radio-pill"><input type="radio" name="gender" value="feminino"><span class="radio-pill-dot"></span><span>Feminino</span></label><label class="radio-pill"><input type="radio" name="gender" value="neutro"><span class="radio-pill-dot"></span><span>Não sei</span></label></div></div>
+      <div class="form-group" id="g-phone" hidden><label>Telefone cadastrado</label><input type="text" id="phoneContact" placeholder="Ex: (62) 99999-0000" ></div>
+      <div class="form-group" id="g-multa" hidden><label>Vigência mínima de 12 meses cumprida?</label><div class="radio-group"><label class="radio-pill"><input type="radio" name="vigencia" value="sim"><span class="radio-pill-dot"></span><span>Sim — sem multa</span></label><label class="radio-pill"><input type="radio" name="vigencia" value="nao"><span class="radio-pill-dot"></span><span>Não — com multa</span></label></div></div>
+      <div class="form-group" id="g-mensalidade" hidden><label>Mensalidades em aberto?</label><div class="radio-group"><label class="radio-pill"><input type="radio" name="mensalidade" value="sim"><span class="radio-pill-dot"></span><span>Sim — em aberto</span></label><label class="radio-pill"><input type="radio" name="mensalidade" value="nao"><span class="radio-pill-dot"></span><span>Não — em dia</span></label></div></div>
+      <div class="form-group" id="g-mes" hidden><label>Mês da última mensalidade devida</label><input type="text" id="mesMensalidade" placeholder="Ex: março/2026" ></div>
+      <div class="form-group" id="g-agend" hidden><label>Dados do agendamento</label><input type="text" id="agendEspecialidade" placeholder="Especialidade (ex: Ortodontia)" ><br><br><input type="text" id="agendDataHora" placeholder="Data e hora (ex: 15/07/2026 às 14h30)" ><br><br><textarea id="agendClinica" rows="5" placeholder="Clínica: nome, endereço, bairro, CEP, município, telefone"></textarea></div>
+      <button class="btn" onclick="generateText()">Gerar texto</button>
+    </div>
+    <div class="card result-card">
+      <div class="result-section">
+        <div class="result-header"><span class="result-tag">Mensagem</span></div>
+        <div id="generatedText" class="result-area is-empty">Preencha os campos e clique em "Gerar texto".</div>
+        <div class="result-actions"><button class="btn-ghost" onclick="copiarTexto('generatedText', this)">Copiar texto</button></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Pró-rata -->
+  <div id="prorata" class="content-section">
+    <div class="page-header">
+      <h1 class="page-title">Calculadora de pró-rata</h1>
+      <p class="page-subtitle">Calcule o valor proporcional por dias utilizados.</p>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label for="valorTotalProduto">Valor total do plano (R$)</label>
+        <input type="number" id="valorTotalProduto" inputmode="decimal" placeholder="Ex: 89.90" step="0.01" min="0">
+      </div>
+
+      <div class="form-group">
+        <label for="quantidadeDias">Quantidade de dias (1–31)</label>
+        <input type="number" id="quantidadeDias" inputmode="numeric" placeholder="Ex: 15" min="1" max="31">
+      </div>
+
+      <button class="btn" onclick="calcularProporcional()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3M13 3h8m0 0v8m0-8L11 13"/></svg>
+        <span>Calcular</span>
+      </button>
+
+      <div class="result-section">
+        <div class="result-header"><span class="result-tag">Resultado</span></div>
+        <div id="resultadoProporcional" class="result-area">Digite os valores acima para calcular o valor proporcional.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multa -->
+  <div id="multa" class="content-section">
+    <div class="page-header">
+      <h1 class="page-title">Calculadora de multa contratual</h1>
+      <p class="page-subtitle">Calcule a multa de rescisão com base nos meses restantes.</p>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label for="valorMensalidade">Valor da mensalidade (R$)</label>
+        <input type="number" id="valorMensalidade" inputmode="decimal" placeholder="Ex: 59.90" step="0.01" min="0">
+      </div>
+
+      <div class="form-group">
+        <label for="mesesFaltantes">Meses restantes no contrato</label>
+        <input type="number" id="mesesFaltantes" inputmode="numeric" placeholder="Ex: 8" min="0">
+      </div>
+
+      <button class="btn" onclick="calcularMulta()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 7H6a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3M13 3h8m0 0v8m0-8L11 13"/></svg>
+        <span>Calcular</span>
+      </button>
+
+      <div class="result-section">
+        <div class="result-header"><span class="result-tag">Resultado</span></div>
+        <div id="multaResultado" class="result-area">Digite os valores acima para calcular a multa.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Abrangências -->
+  <div id="abrangencias" class="content-section">
+    <div class="page-header">
+      <h1 class="page-title">Abrangências dos planos</h1>
+      <p class="page-subtitle">Consulte os detalhes de cobertura pelo código do produto (Registro ANS).</p>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label for="inputNumber">Código do produto (Registro ANS)</label>
+        <input type="number" id="inputNumber" inputmode="numeric" placeholder="Ex: 473269153">
+      </div>
+
+      <button class="btn" onclick="consultarPlano()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <span>Consultar plano</span>
+      </button>
+
+      <div class="result-section">
+        <div class="result-header"><span class="result-tag">Resultado</span></div>
+        <div id="result" class="result-area">
+          <span id="resultado">Digite o código do produto para consultar.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Administração -->
+  <div id="admin" class="content-section">
+    <div class="page-header"><h1 class="page-title">Administração</h1><p class="page-subtitle">Cadastre e edite as mensagens e as abrangências por aqui.</p></div>
+    <div class="card admin-card" id="adminLoginCard">
+      <h2 class="admin-heading">Acesso administrativo</h2>
+      <p class="admin-description">Entre com a conta de administrador.</p>
+      <form id="adminAuthForm" class="admin-form">
+        <div class="form-group"><label for="adminEmail">E-mail</label><input type="email" id="adminEmail" autocomplete="email" required></div>
+        <div class="form-group"><label for="adminPassword">Senha</label><input type="password" id="adminPassword" autocomplete="current-password" required></div>
+        <div id="adminAuthMessage" class="admin-message" role="status"></div>
+        <button class="btn" type="submit">Entrar</button>
+      </form>
+    </div>
+    <div class="card admin-card admin-editor-card" id="adminEditorCard" hidden>
+      <div class="admin-editor-header"><h2 class="admin-heading">Painel de conteúdo</h2><button class="btn-ghost" type="button" onclick="signOutAdmin()">Sair</button></div>
+      <div class="tabs"><button class="tab active" type="button" data-tab="tabMsg">Mensagens</button><button class="tab" type="button" data-tab="tabPlan">Abrangências</button></div>
+      <div id="tabMsg">
+        <div class="form-group"><label for="tplSelect">Mensagem</label><select id="tplSelect" onchange="selectTemplate(this.value)"></select></div>
+        <div class="form-group"><label for="tplLabel">Nome da finalidade</label><input type="text" id="tplLabel" placeholder="Ex: Envio de boleto"></div>
+        <div class="form-group"><label for="tplContent">Texto da mensagem</label><textarea id="tplContent" rows="12"></textarea>
+          <p class="field-hint">Clique para inserir um campo no texto. O formulário só pede os campos que a mensagem usa.</p><div class="chips"><button class="chip" type="button" onclick="insertField('name')">Nome</button><button class="chip" type="button" onclick="insertField('gender')">Prezado(a)</button><button class="chip" type="button" onclick="insertField('genderAdj')">tranquilo(a)</button><button class="chip" type="button" onclick="insertField('genderPart')">comunicado(a)</button><button class="chip" type="button" onclick="insertField('greeting')">Bom dia/tarde/noite</button><button class="chip" type="button" onclick="insertField('protocol')">Protocolo</button><button class="chip" type="button" onclick="insertField('phone')">Telefone</button><button class="chip" type="button" onclick="insertField('multa')">Multa</button><button class="chip" type="button" onclick="insertField('mensalidade')">Mensalidades</button><button class="chip" type="button" onclick="insertField('agendEspecialidade')">Especialidade</button><button class="chip" type="button" onclick="insertField('agendDataHora')">Data e hora</button><button class="chip" type="button" onclick="insertField('agendClinica')">Clínica</button></div></div>
+        <div class="row-actions"><button class="btn" type="button" onclick="saveTemplate()">Salvar mensagem</button><button class="btn-delete-template" id="tplDelete" type="button" onclick="deleteTemplate()" hidden>Excluir</button></div>
+      </div>
+      <div id="tabPlan" hidden>
+        <div class="form-group"><label for="planSelect">Código cadastrado</label><select id="planSelect" onchange="selectPlan(this.value)"></select></div>
+        <div class="form-group"><label for="planCode">Código do produto (Registro ANS)</label><input type="text" id="planCode" inputmode="numeric" placeholder="Ex: 473269153"></div>
+        <div class="form-group"><label for="planContent">Detalhes da cobertura</label><textarea id="planContent" rows="8"></textarea>
+          <p class="field-hint">Separe os itens com quebra de linha ou " | ". Texto antes dos dois-pontos fica em negrito (ex.: Abrangência: Nacional).</p></div>
+        <div class="row-actions"><button class="btn" type="button" onclick="savePlan()">Salvar abrangência</button><button class="btn-delete-template" id="planDelete" type="button" onclick="deletePlan()" hidden>Excluir</button></div>
+      </div>
+      <div id="adminSaveMessage" class="admin-message" role="status" style="margin-top:16px"></div>
+    </div>
+  </div>
+</div><!-- /.main -->
+
+  <script src="script.js"></script>
+
+<footer class="app-footer">
+</footer>
+</body>
+</html>
